@@ -31,35 +31,22 @@ extern void showString(char *str);
 extern void showLength(int leng);
 /// ###
 
-//extern double Uniforme();
-
-int tr[MAX];
-
-/// 距離の計算はこの関数と同等の方法で行う．
-/// 必ずしもこの関数を残しておく必要は無い．
-int Dis(int i, int j)
-{
-  float xd, yd;
-
-  xd = city[i][0] - city[j][0];
-  yd = city[i][1] - city[j][1];
-  return (int)(sqrt(xd * xd + yd * yd) + .5);
-}
-
-/// 以下 int tspSolver(void) が必要なこと以外は自由に作る．
-///
-
+// イテレーション(ループ)回数
 #define ITERATIONS		(int)500
-
+// アリの数
 #define NUMBEROFANTS	(int)20
+// 都市の数
 #define NUMBEROFCITIES	(int)n
-
+// フェロモンの優先度
 // if (ALPHA == 0) { stochastic search & sub-optimal route }
 #define ALPHA			(double)0.2
+// 距離の優先度
 // if (BETA  == 0) { sub-optimal route }
 #define BETA			(double)1.0
+// 総距離の影響を左右する定数
 // Estimation of the suspected best route.
 #define Q				(double)100
+// フェロモンの蒸発率
 // Pheromones evaporation. 
 #define RO				(double)0.4
 // Maximum pheromone random number.
@@ -70,7 +57,14 @@ int Dis(int i, int j)
 
 double BESTLENGTH;
 
+/* GRAPH[i][j] : if(i-jに道) 1 else 0 
+ * RPUTES[i][j] : アリiがj番目に行く都市
+ */
 int **GRAPH, **ROUTES;
+/* PHEROMONES[i][j] : 道i-jのフェロモン量
+ * DELTAPHEROMONS[i][j] : 道i-jのフェロモン変化量 Q/アリkの順路長
+ * PROB[i][0] : i番目の都市へ行く時のフェロモン値, PROB[i][1] : i番目の都市のID
+ */
 double /* **CITIES,*/ **PHEROMONES, **DELTAPHEROMONES, **PROBS;
 
 void init () {
@@ -107,6 +101,23 @@ void init () {
 	BESTLENGTH = (double) INT_MAX;
   showString("Initialized!");
   srand((unsigned)time(NULL));
+}
+
+void end() {
+	for(int i=0; i<NUMBEROFANTS; i++) {
+		free(ROUTES[i]);
+	}
+	free(ROUTES);
+	for(int i=0; i<NUMBEROFCITIES; i++) {
+		free(GRAPH[i]);
+		free(PHEROMONES[i]);
+		free(DELTAPHEROMONES[i]);
+		free(PROBS[i]);
+	}
+	free(GRAPH);
+	free(PHEROMONES);
+	free(DELTAPHEROMONES);
+	free(PROBS);
 }
 
 double Uniforme() {
@@ -237,6 +248,7 @@ void route (int antk) {
 	}
 }
 
+// antkが有効な巡回路を通ったか
 int valid (int antk, int iteration) {
 	for(int i=0; i<NUMBEROFCITIES-1; i++) {
 		int cityi = ROUTES[antk][i];
@@ -287,8 +299,8 @@ void optimize () {
 		for (int k=0; k<NUMBEROFANTS; k++) {
 			char str[100];
       sprintf(str,"[%d] ant %d has been released!",iterations, k);
-      //printf("%s\n",str);
-      showString(str);
+      printf("%s\n",str);
+      //showString(str);
       //showTour(tour, 10, 0);
 			while (0 != valid(k, iterations)) {
 				//printf("\treleasing ant %d again!\n", k);;
@@ -312,10 +324,10 @@ void optimize () {
 					tour[i] = ROUTES[k][i];
 				}
         showString("Updated");
-        showTour(tour, 1000, 0);
+        //showTour(tour, 1000, 0);
         showString("serching");
 			} else {
-        showTour(ROUTES[k], 10, 1);
+        //showTour(ROUTES[k], 10, 1);
       }
 		}		
 
@@ -352,6 +364,7 @@ int tspSolver(void)
 
   printf("BEST LENGTH = %f\n", BESTLENGTH);
 
+  end();
   return 1;
 }
 
