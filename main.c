@@ -78,7 +78,7 @@ int *NN;
 
 void init()
 {
-	NN = (int *)malloc(sizeof(int)*NUMBEROFCITIES);
+	NN = (int *)malloc(sizeof(int) * NUMBEROFCITIES);
 	GRAPH = (int **)malloc(sizeof(int *) * NUMBEROFCITIES);
 	PHEROMONES = (double **)malloc(sizeof(double *) * NUMBEROFCITIES);
 	DELTAPHEROMONES = (double **)malloc(sizeof(double *) * NUMBEROFCITIES);
@@ -95,8 +95,10 @@ void init()
 		}
 		for (int j = 0; j < NUMBEROFCITIES; j++)
 		{
-			if(i != j) GRAPH[i][j] = 1;
-			else	GRAPH[i][j] = 0;
+			if (i != j)
+				GRAPH[i][j] = 1;
+			else
+				GRAPH[i][j] = 0;
 
 			PHEROMONES[i][j] = 0.0;
 			DELTAPHEROMONES[i][j] = 0.0;
@@ -142,15 +144,14 @@ void end()
 
 double Uniforme()
 {
-	return (double)rand()/RAND_MAX;
+	return (double)rand() / RAND_MAX;
 }
 
 int distance(int cityi, int cityj)
 {
-	return (int)
-		(sqrt(pow(city[cityi][0] - city[cityj][0], 2) +
-			 pow(city[cityi][1] - city[cityj][1], 2))
-			 + 0.5);
+	return (int)(sqrt(pow(city[cityi][0] - city[cityj][0], 2) +
+					  pow(city[cityi][1] - city[cityj][1], 2)) +
+				 0.5);
 }
 
 int exists(int cityi, int cityc)
@@ -158,63 +159,77 @@ int exists(int cityi, int cityc)
 	return (GRAPH[cityi][cityc] == 1);
 }
 
-void NearestNeighbor() {
-    for(int i=0; i<NUMBEROFCITIES; i++) {
+void NearestNeighbor()
+{
+	for (int i = 0; i < NUMBEROFCITIES; i++)
+	{
 		NN[i] = i;
 	}
-	
-	for (int i = 0; i < NUMBEROFCITIES-2; i++) {
-        int posmin;
+
+	for (int i = 0; i < NUMBEROFCITIES - 2; i++)
+	{
+		int posmin;
 		int distmin = INT_MAX;
-        for (int v = i+1; v < NUMBEROFCITIES; v++) {
-            int dist = distance(NN[i], NN[v]);
-            if (dist < distmin) {
-                posmin = v;
-                distmin = dist;
-            }
-        }
-        int t = NN[i+1];
-		NN[i+1] = NN[posmin];
+		for (int v = i + 1; v < NUMBEROFCITIES; v++)
+		{
+			int dist = distance(NN[i], NN[v]);
+			if (dist < distmin)
+			{
+				posmin = v;
+				distmin = dist;
+			}
+		}
+		int t = NN[i + 1];
+		NN[i + 1] = NN[posmin];
 		NN[posmin] = t;
-    }
+	}
 
 	int d = 0;
-	for(int i=0; i<NUMBEROFCITIES-1; i++) {
-		d += distance(NN[i], NN[i+1]);
+	for (int i = 0; i < NUMBEROFCITIES - 1; i++)
+	{
+		d += distance(NN[i], NN[i + 1]);
 	}
-	d += distance(NN[NUMBEROFCITIES-1], NN[0]);
+	d += distance(NN[NUMBEROFCITIES - 1], NN[0]);
 
-	TAU0 = (double) 1.0/(d*NUMBEROFCITIES);
+	TAU0 = (double)1.0 / (d * NUMBEROFCITIES);
 	//showTour(NN, 5000, 0);
 }
 
-void initPHEROMONES() {
-	for(int i=0; i<NUMBEROFCITIES; i++) {
-		for(int j=0; j<NUMBEROFCITIES; j++) {
-			if(exists(i,j)) {
+void initPHEROMONES()
+{
+	for (int i = 0; i < NUMBEROFCITIES; i++)
+	{
+		for (int j = 0; j < NUMBEROFCITIES; j++)
+		{
+			if (exists(i, j))
+			{
 				PHEROMONES[i][j] = TAU0;
 				PHEROMONES[j][i] = PHEROMONES[i][j];
 			}
 		}
 	}
-///*
+	///*
 	int d = 0;
-	for(int i=0; i<NUMBEROFCITIES-1; i++) {
-		d += distance(NN[i], NN[i+1]);
+	for (int i = 0; i < NUMBEROFCITIES - 1; i++)
+	{
+		d += distance(NN[i], NN[i + 1]);
 	}
-	d += distance(NN[NUMBEROFCITIES-1], NN[0]);
+	d += distance(NN[NUMBEROFCITIES - 1], NN[0]);
 
-	for(int i=0; i<NUMBEROFCITIES-1; i++) {
-		if(distance(NN[i],NN[i+1]) < (double) d/NUMBEROFCITIES) {
-			PHEROMONES[NN[i]][NN[i+1]] = TAU0*XI;
-			PHEROMONES[NN[i+1]][NN[i]] = PHEROMONES[NN[i]][NN[i+1]];
+	for (int i = 0; i < NUMBEROFCITIES - 1; i++)
+	{
+		if (distance(NN[i], NN[i + 1]) < (double)d / NUMBEROFCITIES)
+		{
+			PHEROMONES[NN[i]][NN[i + 1]] = TAU0 * XI;
+			PHEROMONES[NN[i + 1]][NN[i]] = PHEROMONES[NN[i]][NN[i + 1]];
 		}
 	}
-	if(distance(NN[0],NN[NUMBEROFCITIES-1]) < (double) d/NUMBEROFCITIES) {
-		PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]] = TAU0*XI;
-		PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]] = PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]];
+	if (distance(NN[0], NN[NUMBEROFCITIES - 1]) < (double)d / NUMBEROFCITIES)
+	{
+		PHEROMONES[NN[NUMBEROFCITIES - 1]][NN[0]] = TAU0 * XI;
+		PHEROMONES[NN[0]][NN[NUMBEROFCITIES - 1]] = PHEROMONES[NN[NUMBEROFCITIES - 1]][NN[0]];
 	}
-//*/
+	//*/
 }
 
 int visited(int antk, int c)
@@ -261,7 +276,7 @@ int Length(int antk)
 	{
 		sum += distance(ROUTES[antk][j], ROUTES[antk][j + 1]);
 	}
-	sum += distance(ROUTES[antk][NUMBEROFCITIES-1], ROUTES[antk][0]);
+	sum += distance(ROUTES[antk][NUMBEROFCITIES - 1], ROUTES[antk][0]);
 	return sum;
 }
 
@@ -270,10 +285,12 @@ int MaxTauEtaCity(int count)
 {
 	double t = 0.0;
 	int city;
-	for(int i=0; i<count; i++){
-		if(PROBS[i][0] >= t) {
+	for (int i = 0; i < count; i++)
+	{
+		if (PROBS[i][0] >= t)
+		{
 			t = PROBS[i][0];
-			city = (int) PROBS[i][1];
+			city = (int)PROBS[i][1];
 		}
 	}
 	return city;
@@ -375,9 +392,9 @@ void GlobalUpdatePHEROMONES()
 		if (Length(k) < BESTLENGTH)
 		{
 			BESTLENGTH = Length(k);
-			for(int i=0; i<NUMBEROFCITIES; i++) 
+			for (int i = 0; i < NUMBEROFCITIES; i++)
 				tour[i] = ROUTES[k][i];
-			
+
 			//showString("Updated");
 			//showTour(tour, 10, 0);
 		}
@@ -386,11 +403,11 @@ void GlobalUpdatePHEROMONES()
 	{
 		int cityi = tour[r];
 		int cityj = tour[r + 1];
-		DELTAPHEROMONES[cityi][cityj] += (double) (1.0 / BESTLENGTH);
-		DELTAPHEROMONES[cityj][cityi] += (double) (1.0 / BESTLENGTH);
+		DELTAPHEROMONES[cityi][cityj] += (double)(1.0 / BESTLENGTH);
+		DELTAPHEROMONES[cityj][cityi] += (double)(1.0 / BESTLENGTH);
 	}
-	DELTAPHEROMONES[tour[NUMBEROFCITIES-1]][tour[0]] += (double) (1.0 / BESTLENGTH);
-	DELTAPHEROMONES[tour[0]][tour[NUMBEROFCITIES-1]] += (double) (1.0 / BESTLENGTH);
+	DELTAPHEROMONES[tour[NUMBEROFCITIES - 1]][tour[0]] += (double)(1.0 / BESTLENGTH);
+	DELTAPHEROMONES[tour[0]][tour[NUMBEROFCITIES - 1]] += (double)(1.0 / BESTLENGTH);
 
 	for (int i = 0; i < NUMBEROFCITIES; i++)
 	{
@@ -408,13 +425,20 @@ void LocalUpdatePHEROMONES()
 	{
 		for (int j = 0; j < NUMBEROFCITIES; j++)
 		{
-			if(PHEROMONES[i][j] != 0) PHEROMONES[i][j] = (1.0 - FI) * PHEROMONES[i][j] + FI * TAU0;
+			if (PHEROMONES[i][j] != 0)
+				PHEROMONES[i][j] = (1.0 - FI) * PHEROMONES[i][j] + FI * TAU0;
 		}
 	}
 }
 
+FILE *fp;
+char s[256];
+
 void optimize()
 {
+	clock_t start, now;
+	start = clock();
+	int tempBest = INT_MAX;
 	for (int iterations = 1; iterations <= ITERATIONS; iterations++)
 	{
 		for (int k = 0; k < NUMBEROFANTS; k++)
@@ -423,7 +447,7 @@ void optimize()
 			{
 				route(k);
 			}
-			LocalUpdatePHEROMONES();	
+			LocalUpdatePHEROMONES();
 		}
 
 		GlobalUpdatePHEROMONES();
@@ -435,40 +459,42 @@ void optimize()
 				ROUTES[i][j] = -1;
 			}
 		}
+
+		now = clock();
+		sprintf(s, "%.5f\t%d\n", (double)(now - start) / CLOCKS_PER_SEC, BESTLENGTH);
+		fputs(s, fp);
 	}
 }
 
 int tspSolver(void)
 {
-	double param[10] = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0};
-	FILE *fp;
-	char s[256];
-	if ((fp = fopen("output.txt", "w")) == NULL) {
-		printf("file open error!!\n");
-		exit(EXIT_FAILURE);	/* (3)エラーの場合は通常、異常終了する */
-	}
+	double param[11] = {1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0};
+	char filename[255];
 
-	for(int p=0; p<10; p++) {
+	for (int p = 0; p < 11; p++)
+	{
 		XI = param[p];
-		sprintf(s, "XI = %f\n", XI);
-		fputs(s,fp);
-	for(int i=0; i<25; i++) {
-	init();
-	//printf("initialized\n");
 
-	NearestNeighbor();
-	initPHEROMONES();
+		for (int i = 0; i < 25; i++)
+		{
+			sprintf(filename, "output/XI%.0f-%d.txt", XI*10, i);
+			if ((fp = fopen(filename, "w")) == NULL)
+			{
+				printf("file open error!!\n");
+				exit(EXIT_FAILURE);
+			}
 
-	//printf("connected!\n");
+			init();
 
-	optimize();
+			NearestNeighbor();
+			initPHEROMONES();
 
-	sprintf(s, "%d\n", BESTLENGTH);
-	fputs(s, fp);
-	//printf("BEST LENGTH = %d\n", BESTLENGTH);
+			optimize();
 
-	end();
-	}
+			end();
+
+			fputs("\n",fp);
+		}
 	}
 
 	fclose(fp);
