@@ -54,11 +54,10 @@ extern void showLength(int leng);
 // For ACS, local updateの割合[0,1]
 #define FI (double)0.1
 
-// For NN-ACS
-#define T (int)n/4
-#define XI (double)0.9
-
 #define INITIALCITY (int)0
+
+// For NN-ACS
+double XI;
 
 int BESTLENGTH;
 // 全経路のフェロモン初期値
@@ -198,14 +197,23 @@ void initPHEROMONES() {
 			}
 		}
 	}
-/*
+///*
+	int d = 0;
 	for(int i=0; i<NUMBEROFCITIES-1; i++) {
-		PHEROMONES[NN[i]][NN[i+1]] += TAU0;
-		PHEROMONES[NN[i+1]][NN[i]] = PHEROMONES[NN[i]][NN[i+1]];
+		d += distance(NN[i], NN[i+1]);
 	}
+	d += distance(NN[NUMBEROFCITIES-1], NN[0]);
 
-	PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]] += TAU0;
-	PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]] = PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]];
+	for(int i=0; i<NUMBEROFCITIES-1; i++) {
+		if(distance(NN[i],NN[i+1]) < (double) d/NUMBEROFCITIES) {
+			PHEROMONES[NN[i]][NN[i+1]] = TAU0*XI;
+			PHEROMONES[NN[i+1]][NN[i]] = PHEROMONES[NN[i]][NN[i+1]];
+		}
+	}
+	if(distance(NN[0],NN[NUMBEROFCITIES-1]) < (double) d/NUMBEROFCITIES) {
+		PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]] = TAU0*XI;
+		PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]] = PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]];
+	}
 //*/
 }
 
@@ -243,7 +251,7 @@ double PHI(int cityi, int cityj, int antk)
 			}
 		}
 	}
-	return (ETAij * TAUij) / sum;
+	return (sum != 0) ? (ETAij * TAUij) / sum : 0;
 }
 
 int Length(int antk)
@@ -372,7 +380,6 @@ void GlobalUpdatePHEROMONES()
 			
 			//showString("Updated");
 			//showTour(tour, 10, 0);
-			//showString("serching");
 		}
 	}
 	for (int r = 0; r < NUMBEROFCITIES - 1; r++)
@@ -401,19 +408,9 @@ void LocalUpdatePHEROMONES()
 	{
 		for (int j = 0; j < NUMBEROFCITIES; j++)
 		{
-			PHEROMONES[i][j] = (1.0 - FI) * PHEROMONES[i][j] + FI * TAU0;
+			if(PHEROMONES[i][j] != 0) PHEROMONES[i][j] = (1.0 - FI) * PHEROMONES[i][j] + FI * TAU0;
 		}
 	}
-}
-
-void NNACS() {
-	for(int i=0; i<NUMBEROFCITIES-1; i++) {
-		PHEROMONES[NN[i]][NN[i+1]] = (1.0-XI)*PHEROMONES[NN[i]][NN[i+1]]+XI*(1.0/distance(NN[i],NN[i+1]));
-		PHEROMONES[NN[i+1]][NN[i]] = PHEROMONES[NN[i]][NN[i+1]];
-	}
-
-	PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]] = (1.0-XI)*PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]]+XI*(1.0/distance(NN[0],NN[NUMBEROFCITIES-1]));
-	PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]] = PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]];
 }
 
 void optimize()
@@ -430,11 +427,7 @@ void optimize()
 		}
 
 		GlobalUpdatePHEROMONES();
-		/*
-		if(iterations == T) {
-			NNACS();
-		}
-		//*/
+
 		for (int i = 0; i < NUMBEROFANTS; i++)
 		{
 			for (int j = 0; j < NUMBEROFCITIES; j++)
@@ -447,21 +440,38 @@ void optimize()
 
 int tspSolver(void)
 {
+	double param[10] = {1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0};
+	FILE *fp;
+	char s[256];
+	if ((fp = fopen("output.txt", "w")) == NULL) {
+		printf("file open error!!\n");
+		exit(EXIT_FAILURE);	/* (3)エラーの場合は通常、異常終了する */
+	}
+
+	for(int p=0; p<10; p++) {
+		XI = param[p];
+		sprintf(s, "XI = %f\n", XI);
+		fputs(s,fp);
 	for(int i=0; i<25; i++) {
 	init();
-	printf("initialized\n");
+	//printf("initialized\n");
 
 	NearestNeighbor();
 	initPHEROMONES();
 
-	printf("connected!\n");
+	//printf("connected!\n");
 
 	optimize();
 
-	printf("BEST LENGTH = %d\n", BESTLENGTH);
+	sprintf(s, "%d\n", BESTLENGTH);
+	fputs(s, fp);
+	//printf("BEST LENGTH = %d\n", BESTLENGTH);
 
 	end();
 	}
+	}
+
+	fclose(fp);
 
 	return 1;
 }
