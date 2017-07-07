@@ -35,33 +35,32 @@ extern void showLength(int leng);
 /// ###
 
 // イテレーション(ループ)回数
-#define ITERATIONS (int)500
+#define ITERATIONS (int)2500
 // アリの数
 #define NUMBEROFANTS (int)10
 // 都市の数
 #define NUMBEROFCITIES (int)n
 // フェロモンの優先度
 // if (ALPHA == 0) { stochastic search & sub-optimal route }
-#define ALPHA (double)1
+#define ALPHA (double)1.0
 // 距離の優先度
 // if (BETA  == 0) { sub-optimal route }
-#define BETA (double)2
-// 総距離の影響を左右する定数
-// Estimation of the suspected best route.
-#define Q (double)1
+#define BETA (double)2.0
 // フェロモンの蒸発率
 // Pheromones evaporation.
 #define RO (double)0.1
-// Maximum pheromone random number.
-// #define TAUMAX (int)2
 // For ACS, global updateをする確率[0,1], フェロモン*距離の逆数が一番高い都市を選ぶ確率
-#define Q0 (double)0.8
+#define Q0 (double)0.9
 // For ACS, local updateの割合[0,1]
 #define FI (double)0.1
 
+// For NN-ACS
+#define T (int)n/4
+#define XI (double)0.9
+
 #define INITIALCITY (int)0
 
-double BESTLENGTH, BEST;
+int BESTLENGTH;
 // 全経路のフェロモン初期値
 double TAU0;
 
@@ -69,16 +68,18 @@ int MaxTauEta;
 /* GRAPH[i][j] : if(i-jに道) 1 else 0 
  * RPUTES[i][j] : アリiがj番目に行く都市
  */
-int **GRAPH, **ROUTES, *BESTSOFAR;
+int **GRAPH, **ROUTES;
 /* PHEROMONES[i][j] : 道i-jのフェロモン量
  * DELTAPHEROMONS[i][j] : 道i-jのフェロモン変化量 Q/アリkの順路長
  * PROB[i][0] : i番目の都市へ行く時のフェロモン値, PROB[i][1] : i番目の都市のID
  */
 double **PHEROMONES, **DELTAPHEROMONES, **PROBS;
 
+int *NN;
+
 void init()
 {
-	BESTSOFAR = (int *)malloc(sizeof(int)*NUMBEROFCITIES);
+	NN = (int *)malloc(sizeof(int)*NUMBEROFCITIES);
 	GRAPH = (int **)malloc(sizeof(int *) * NUMBEROFCITIES);
 	PHEROMONES = (double **)malloc(sizeof(double *) * NUMBEROFCITIES);
 	DELTAPHEROMONES = (double **)malloc(sizeof(double *) * NUMBEROFCITIES);
@@ -95,7 +96,9 @@ void init()
 		}
 		for (int j = 0; j < NUMBEROFCITIES; j++)
 		{
-			GRAPH[i][j] = 0;
+			if(i != j) GRAPH[i][j] = 1;
+			else	GRAPH[i][j] = 0;
+
 			PHEROMONES[i][j] = 0.0;
 			DELTAPHEROMONES[i][j] = 0.0;
 		}
@@ -111,8 +114,7 @@ void init()
 		}
 	}
 
-	BESTLENGTH = DBL_MAX;
-	BEST = DBL_MAX;
+	BESTLENGTH = INT_MAX;
 	showString("Initialized!");
 	srand((unsigned)time(NULL));
 	MaxTauEta = 0;
@@ -136,27 +138,20 @@ void end()
 	free(PHEROMONES);
 	free(DELTAPHEROMONES);
 	free(PROBS);
-}
-
-uint32_t xor (void) {
-	static uint32_t y = 2463534242;
-	y = y ^ (y << 13);
-	y = y ^ (y >> 17);
-	return y = y ^ (y << 5);
+	free(NN);
 }
 
 double Uniforme()
 {
-	uint32_t y = UINT32_MAX;
-	return (double) xor() / y;
-	//return (double)rand()/RAND_MAX;
+	return (double)rand()/RAND_MAX;
 }
 
-double distance(int cityi, int cityj)
+int distance(int cityi, int cityj)
 {
-	return (double)
-		sqrt(pow(city[cityi][0] - city[cityj][0], 2) +
-			 pow(city[cityi][1] - city[cityj][1], 2));
+	return (int)
+		(sqrt(pow(city[cityi][0] - city[cityj][0], 2) +
+			 pow(city[cityi][1] - city[cityj][1], 2))
+			 + 0.5);
 }
 
 int exists(int cityi, int cityc)
@@ -164,40 +159,34 @@ int exists(int cityi, int cityc)
 	return (GRAPH[cityi][cityc] == 1);
 }
 
-void NearestNeighbor()
-{
-	int visited[NUMBEROFCITIES];
-	double totalLen = 0.0;
-	int NN[NUMBEROFCITIES];
-
-	for (int i = 0; i < NUMBEROFCITIES; i++)
-	{
-		memset(visited, -1, sizeof(visited));
-		int cityi = i;
-		for (int j = 0; j < NUMBEROFCITIES - 1; j++)
-		{
-			double leng = DBL_MAX;
-			NN[j] = cityi;
-			visited[cityi] = 1;
-			for (int cityj = 0; cityj < NUMBEROFCITIES; cityj++)
-			{
-				if (visited[cityj] != -1)
-					continue;
-				if (distance(cityi, cityj) < leng)
-				{
-					leng = distance(cityi, cityj);
-					cityi = cityj;
-				}
-			}
-			totalLen += leng;
-		}
-		NN[NUMBEROFCITIES - 1] = i;
-		totalLen += distance(NN[NUMBEROFCITIES - 2], NN[NUMBEROFCITIES - 1]);
-		//showTour(NN,1000,0);
-		//for(int k = 0; k < NUMBEROFCITIES; k++) printf("%d ", NN[k]);
+void NearestNeighbor() {
+    for(int i=0; i<NUMBEROFCITIES; i++) {
+		NN[i] = i;
 	}
 	
-	TAU0 = 1.0/totalLen;
+	for (int i = 0; i < NUMBEROFCITIES-2; i++) {
+        int posmin;
+		int distmin = INT_MAX;
+        for (int v = i+1; v < NUMBEROFCITIES; v++) {
+            int dist = distance(NN[i], NN[v]);
+            if (dist < distmin) {
+                posmin = v;
+                distmin = dist;
+            }
+        }
+        int t = NN[i+1];
+		NN[i+1] = NN[posmin];
+		NN[posmin] = t;
+    }
+
+	int d = 0;
+	for(int i=0; i<NUMBEROFCITIES-1; i++) {
+		d += distance(NN[i], NN[i+1]);
+	}
+	d += distance(NN[NUMBEROFCITIES-1], NN[0]);
+
+	TAU0 = (double) 1.0/(d*NUMBEROFCITIES);
+	//showTour(NN, 5000, 0);
 }
 
 void initPHEROMONES() {
@@ -209,14 +198,15 @@ void initPHEROMONES() {
 			}
 		}
 	}
-}
+/*
+	for(int i=0; i<NUMBEROFCITIES-1; i++) {
+		PHEROMONES[NN[i]][NN[i+1]] += TAU0;
+		PHEROMONES[NN[i+1]][NN[i]] = PHEROMONES[NN[i]][NN[i+1]];
+	}
 
-void connectCITIES(int cityi, int cityj)
-{
-	GRAPH[cityi][cityj] = 1;
-	//PHEROMONES[cityi][cityj] = TAU0; //Uniforme() * TAUMAX;
-	GRAPH[cityj][cityi] = 1;
-	//PHEROMONES[cityj][cityi] = PHEROMONES[cityi][cityj];
+	PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]] += TAU0;
+	PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]] = PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]];
+//*/
 }
 
 int visited(int antk, int c)
@@ -235,51 +225,10 @@ int visited(int antk, int c)
 	return 0;
 }
 
-void printPHEROMONES()
-{
-	printf(" PHEROMONES: \n");
-	printf("  |");
-	for (int i = 0; i < NUMBEROFCITIES; i++)
-		printf("%5d   ", i);
-	printf("\n- | ");
-	for (int i = 0; i < NUMBEROFCITIES; i++)
-		printf("--------");
-	printf("\n");
-	for (int i = 0; i < NUMBEROFCITIES; i++)
-	{
-		printf("%d | ", i);
-		for (int j = 0; j < NUMBEROFCITIES; j++)
-		{
-			if (i == j)
-			{
-				printf("%5s   ", "x");
-				continue;
-			}
-			if (exists(i, j))
-			{
-				printf("%7.3f ", PHEROMONES[i][j]);
-			}
-			else
-			{
-				if (PHEROMONES[i][j] == 0.0)
-				{
-					printf("%5.0f   ", PHEROMONES[i][j]);
-				}
-				else
-				{
-					printf("%7.3f ", PHEROMONES[i][j]);
-				}
-			}
-		}
-		printf("\n");
-	}
-	printf("\n");
-}
-
 double PHI(int cityi, int cityj, int antk)
 {
-	double ETAij = (double)pow(1 / distance(cityi, cityj), BETA);
-	double TAUij = (double)pow(PHEROMONES[cityi][cityj], ALPHA);
+	double ETAij = pow((double)(1.0 / distance(cityi, cityj)), BETA);
+	double TAUij = pow(PHEROMONES[cityi][cityj], ALPHA);
 
 	double sum = 0.0;
 	for (int c = 0; c < NUMBEROFCITIES; c++)
@@ -288,8 +237,8 @@ double PHI(int cityi, int cityj, int antk)
 		{
 			if (!visited(antk, c))
 			{
-				double ETA = (double)pow(1 / distance(cityi, c), BETA);
-				double TAU = (double)pow(PHEROMONES[cityi][c], ALPHA);
+				double ETA = pow((double)(1.0 / distance(cityi, c)), BETA);
+				double TAU = pow(PHEROMONES[cityi][c], ALPHA);
 				sum += ETA * TAU;
 			}
 		}
@@ -297,13 +246,14 @@ double PHI(int cityi, int cityj, int antk)
 	return (ETAij * TAUij) / sum;
 }
 
-double Length(int antk)
+int Length(int antk)
 {
-	double sum = 0.0;
+	int sum = 0;
 	for (int j = 0; j < NUMBEROFCITIES - 1; j++)
 	{
 		sum += distance(ROUTES[antk][j], ROUTES[antk][j + 1]);
 	}
+	sum += distance(ROUTES[antk][NUMBEROFCITIES-1], ROUTES[antk][0]);
 	return sum;
 }
 
@@ -315,7 +265,7 @@ int MaxTauEtaCity(int count)
 	for(int i=0; i<count; i++){
 		if(PROBS[i][0] >= t) {
 			t = PROBS[i][0];
-			city = PROBS[i][1];
+			city = (int) PROBS[i][1];
 		}
 	}
 	return city;
@@ -323,8 +273,8 @@ int MaxTauEtaCity(int count)
 
 int City(int count)
 {
-	double xi = Uniforme();
-	if (xi <= Q0)
+	double Q = Uniforme();
+	if (Q <= Q0)
 	{
 		// ACS
 		return MaxTauEtaCity(count);
@@ -334,7 +284,8 @@ int City(int count)
 		// AS
 		int i = 0;
 		double sum = PROBS[i][0];
-		while (sum < xi)
+		double t = Uniforme();
+		while (sum < t)
 		{
 			i++;
 			sum += PROBS[i][0];
@@ -378,7 +329,7 @@ void route(int antk)
 }
 
 // antkが有効な巡回路を通ったか
-int valid(int antk, int iteration)
+int valid(int antk)
 {
 	for (int i = 0; i < NUMBEROFCITIES - 1; i++)
 	{
@@ -409,41 +360,36 @@ int valid(int antk, int iteration)
 	return 0;
 }
 
-void OfflineUpdatePHEROMONES()
+void GlobalUpdatePHEROMONES()
 {
-	/*
-	for (int k=0; k<NUMBEROFANTS; k++) {
-		double rlength = Length(k);
-		for (int r=0; r<NUMBEROFCITIES-1; r++) {
-			int cityi = ROUTES[k][r];
-			int cityj = ROUTES[k][r+1];
-			DELTAPHEROMONES[cityi][cityj] += Q / rlength;
-			DELTAPHEROMONES[cityj][cityi] += Q / rlength;
-		}
-	}
-	*/
-	// ACS
 	for (int k = 0; k < NUMBEROFANTS; k++)
 	{
-		if (Length(k) < BEST)
+		if (Length(k) < BESTLENGTH)
 		{
-			BEST = Length(k);
-			BESTSOFAR = ROUTES[k];
+			BESTLENGTH = Length(k);
+			for(int i=0; i<NUMBEROFCITIES; i++) 
+				tour[i] = ROUTES[k][i];
+			
+			//showString("Updated");
+			//showTour(tour, 10, 0);
+			//showString("serching");
 		}
 	}
 	for (int r = 0; r < NUMBEROFCITIES - 1; r++)
 	{
-		int cityi = BESTSOFAR[r];
-		int cityj = BESTSOFAR[r + 1];
-		DELTAPHEROMONES[cityi][cityj] += Q / BEST;
-		DELTAPHEROMONES[cityj][cityi] += Q / BEST;
+		int cityi = tour[r];
+		int cityj = tour[r + 1];
+		DELTAPHEROMONES[cityi][cityj] += (double) (1.0 / BESTLENGTH);
+		DELTAPHEROMONES[cityj][cityi] += (double) (1.0 / BESTLENGTH);
 	}
+	DELTAPHEROMONES[tour[NUMBEROFCITIES-1]][tour[0]] += (double) (1.0 / BESTLENGTH);
+	DELTAPHEROMONES[tour[0]][tour[NUMBEROFCITIES-1]] += (double) (1.0 / BESTLENGTH);
 
 	for (int i = 0; i < NUMBEROFCITIES; i++)
 	{
 		for (int j = 0; j < NUMBEROFCITIES; j++)
 		{
-			PHEROMONES[i][j] = (1 - RO) * PHEROMONES[i][j] + RO * DELTAPHEROMONES[i][j];
+			PHEROMONES[i][j] = (1.0 - RO) * PHEROMONES[i][j] + RO * DELTAPHEROMONES[i][j];
 			DELTAPHEROMONES[i][j] = 0.0;
 		}
 	}
@@ -455,10 +401,19 @@ void LocalUpdatePHEROMONES()
 	{
 		for (int j = 0; j < NUMBEROFCITIES; j++)
 		{
-			if(exists(i,j))
-				PHEROMONES[i][j] = (1 - FI) * PHEROMONES[i][j] + FI * TAU0;
+			PHEROMONES[i][j] = (1.0 - FI) * PHEROMONES[i][j] + FI * TAU0;
 		}
 	}
+}
+
+void NNACS() {
+	for(int i=0; i<NUMBEROFCITIES-1; i++) {
+		PHEROMONES[NN[i]][NN[i+1]] = (1.0-XI)*PHEROMONES[NN[i]][NN[i+1]]+XI*(1.0/distance(NN[i],NN[i+1]));
+		PHEROMONES[NN[i+1]][NN[i]] = PHEROMONES[NN[i]][NN[i+1]];
+	}
+
+	PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]] = (1.0-XI)*PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]]+XI*(1.0/distance(NN[0],NN[NUMBEROFCITIES-1]));
+	PHEROMONES[NN[0]][NN[NUMBEROFCITIES-1]] = PHEROMONES[NN[NUMBEROFCITIES-1]][NN[0]];
 }
 
 void optimize()
@@ -467,37 +422,19 @@ void optimize()
 	{
 		for (int k = 0; k < NUMBEROFANTS; k++)
 		{
-			while (0 != valid(k, iterations))
+			while (0 != valid(k))
 			{
-				for (int i = 0; i < NUMBEROFCITIES; i++)
-				{
-					ROUTES[k][i] = -1;
-				}
 				route(k);
 			}
-			double rlength = Length(k);
-
-			if (rlength < BESTLENGTH)
-			{
-				BESTLENGTH = rlength;
-				for (int i = 0; i < NUMBEROFCITIES; i++)
-				{
-					tour[i] = ROUTES[k][i];
-				}
-				showString("Updated");
-				showTour(tour, 100, 0);
-				showString("serching");
-			}
-			else
-			{
-				//showTour(ROUTES[k], 10, 1);
-			}
-			LocalUpdatePHEROMONES();
+			LocalUpdatePHEROMONES();	
 		}
 
-		OfflineUpdatePHEROMONES();
-		//printPHEROMONES();
-
+		GlobalUpdatePHEROMONES();
+		/*
+		if(iterations == T) {
+			NNACS();
+		}
+		//*/
 		for (int i = 0; i < NUMBEROFANTS; i++)
 		{
 			for (int j = 0; j < NUMBEROFCITIES; j++)
@@ -510,16 +447,9 @@ void optimize()
 
 int tspSolver(void)
 {
+	for(int i=0; i<25; i++) {
 	init();
 	printf("initialized\n");
-
-	for (int i = 0; i < NUMBEROFCITIES; i++)
-	{
-		for (int j = i + 1; j < NUMBEROFCITIES; j++)
-		{
-			connectCITIES(i, j);
-		}
-	}
 
 	NearestNeighbor();
 	initPHEROMONES();
@@ -528,9 +458,10 @@ int tspSolver(void)
 
 	optimize();
 
-	printf("BEST LENGTH = %f\n", BESTLENGTH);
+	printf("BEST LENGTH = %d\n", BESTLENGTH);
 
 	end();
+	}
 
 	return 1;
 }
