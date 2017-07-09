@@ -463,6 +463,8 @@ void optimize()
 		now = clock();
 		sprintf(s, "%.5f\t%d\n", (double)(now - start) / CLOCKS_PER_SEC, BESTLENGTH);
 		fputs(s, fp);
+
+		if((double)(now - start) / CLOCKS_PER_SEC > 1000.0) return;
 	}
 }
 
@@ -494,10 +496,10 @@ int tspSolver(void)
 			end();
 
 			fputs("\n",fp);
+
+			fclose(fp);
 		}
 	}
-
-	fclose(fp);
 
 	return 1;
 }
