@@ -433,12 +433,14 @@ void LocalUpdatePHEROMONES()
 
 FILE *fp;
 char s[256];
+int result[25][2500];
+double secPerItr;
 
-void optimize()
+void optimize(int c)
 {
+	secPerItr = 0.0;
 	clock_t start, now;
 	start = clock();
-	int tempBest = INT_MAX;
 	for (int iterations = 1; iterations <= ITERATIONS; iterations++)
 	{
 		for (int k = 0; k < NUMBEROFANTS; k++)
@@ -461,44 +463,57 @@ void optimize()
 		}
 
 		now = clock();
-		sprintf(s, "%.5f\t%d\n", (double)(now - start) / CLOCKS_PER_SEC, BESTLENGTH);
-		fputs(s, fp);
+		secPerItr = (double) ((double)(now - start) / CLOCKS_PER_SEC + secPerItr*(iterations-1))/iterations;
+
+		result[c][iterations-1] = BESTLENGTH;
 
 		if((double)(now - start) / CLOCKS_PER_SEC > 1000.0) return;
 	}
 }
 
+#define PARAM 1
+#define ROOP 1
 int tspSolver(void)
 {
 	double param[11] = {1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0};
 	char filename[255];
 
-	for (int p = 0; p < 11; p++)
+	for (int p = 0; p < PARAM; p++)
 	{
 		XI = param[p];
 
-		for (int i = 0; i < 25; i++)
+		sprintf(filename, "output/XI%.0f.txt", XI*10);
+		if ((fp = fopen(filename, "w")) == NULL)
 		{
-			sprintf(filename, "output/XI%.0f-%d.txt", XI*10, i);
-			if ((fp = fopen(filename, "w")) == NULL)
-			{
-				printf("file open error!!\n");
-				exit(EXIT_FAILURE);
-			}
+			printf("file open error!!\n");
+			exit(EXIT_FAILURE);
+		}
 
+		for (int i = 0; i < ROOP; i++)
+		{
 			init();
 
 			NearestNeighbor();
 			initPHEROMONES();
 
-			optimize();
+			optimize(i);
 
 			end();
-
-			fputs("\n",fp);
-
-			fclose(fp);
 		}
+
+		sprintf(s, "%.5f\n", secPerItr);
+		fputs(s, fp);
+
+		for(int itr=0; itr<ITERATIONS; itr++) {
+			double sum = 0.0;
+			for(int i=0; i<ROOP; i++) {
+				sum += result[i][itr];
+			}
+			sprintf(s, "%.2f\n", (double) sum/ROOP);
+			fputs(s,fp);
+		}
+
+		fclose(fp);
 	}
 
 	return 1;
